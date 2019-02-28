@@ -1,4 +1,6 @@
-pragma solidity >=0.5.1 <0.6.0;
+pragma solidity >=0.5.4 <0.6.0;
+
+import "./ECDSA.sol";
 
 contract SmartLockerRegistrar {
     
@@ -48,13 +50,16 @@ contract SmartLockerRegistrar {
 
 contract SmartLocker {
     
-    // transaction nonce
-    uint256 nonce;
-    
+    // use ECDSA library for recovering signatures of hashes
+    using ECDSA for bytes32;
+
     // authorised keys
     mapping(address=>bool) keys;
     uint256 keyCount;
 
+    // next transaction nonce
+    uint256 nextNonce;
+    
     // only authorised keys modifier
     modifier onlyAuthorisedKeys(address sender)
     {
@@ -83,7 +88,7 @@ contract SmartLocker {
         require(key != address(0));
 
         // require key not already authorised
-        require(keys[key] == false);
+        require(!keys[key]);
         
         // add the key as an authorised key
         keys[key] = true;
@@ -94,7 +99,7 @@ contract SmartLocker {
     function removeKey(address key) external onlyAuthorisedKeys(msg.sender) {
         
         // require key already authorised
-        require(keys[key] == true);
+        require(keys[key]);
         
         // require key not the only authorised key
         require(keyCount > 1);
@@ -104,18 +109,36 @@ contract SmartLocker {
         keyCount--;
     }
     
-    // TODO: execute messages signed by authorised keys (external)
-    //function executeSigned() external onlyAuthorisedKeys(signer) returns (uint256) {
-    //    return nonce++;
-    //}
+    // execute transactions if signed by authorised keys (external)
+    function executeSigned(address to, uint256 value, bytes calldata data, bytes calldata signature) external
+      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, signature)) {
+        
+        // execute the transaction and require success
+        // solium-disable-next-line security/no-call-value
+        require(to.call.value(value)(data));
+        
+        // update the nonce
+        nextNonce++;
+    }
+    
+    // recover the signer of a signed message (internal pure)
+    function recoverSigner(address from, address to, uint256 value, bytes memory data, uint256 nonce, bytes memory signature) internal pure returns (address) {
+        bytes32 hash = keccak256(abi.encodePacked(from, to, value, data, nonce));
+        return hash.toEthSignedMessageHash().recover(signature);
+    }
     
     // is the given key an authorised key (external view)
     function isKey(address key) external view returns (bool) {
         return keys[key];
     }
     
-    // get the count of keys
+    // get the count of keys (external view)
     function getKeyCount() external view returns (uint256) {
         return keyCount;
+    }
+    
+    // get the next execution nonce (external view)
+    function getNextNonce() external view returns (uint256) {
+        return nextNonce;
     }
 }
