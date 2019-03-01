@@ -111,14 +111,22 @@ contract SmartLocker {
     
     // execute transactions if signed by authorised keys (external)
     function executeSigned(address to, uint256 value, bytes calldata data, bytes calldata signature) external
-      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, signature)) {
+      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, signature))
+      returns (bytes memory) {
         
-        // execute the transaction and require success
-        // solium-disable-next-line security/no-call-value
-        require(to.call.value(value)(data));
+        // execute the transaction
+        (bool success, bytes memory result) = to.call.value(value)(data);
+        
+        // require success
+        require(success);
         
         // update the nonce
         nextNonce++;
+        
+        // TODO: refund gas
+        // TODO: gas relayers first check for failing tx?
+        // TODO: return the result?
+        return result;
     }
     
     // recover the signer of a signed message (internal pure)
