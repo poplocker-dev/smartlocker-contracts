@@ -110,8 +110,8 @@ contract SmartLocker {
     }
     
     // execute transactions if signed by authorised keys (external)
-    function executeSigned(address to, uint256 value, bytes calldata data, bytes calldata signature) external
-      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, signature))
+    function executeSigned(address to, uint value, bytes calldata data, uint gasPrice, uint gasLimit, bytes calldata signature) external
+      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, gasPrice, gasLimit, signature))
       returns (bytes memory) {
         
         // execute the transaction
@@ -123,15 +123,16 @@ contract SmartLocker {
         // update the nonce
         nextNonce++;
         
-        // TODO: refund gas
+        // TODO: check gas used not over gasLimit
+        // TODO: refund gas using gasPrice
         // TODO: gas relayers first check for failing tx?
         // TODO: return the result?
         return result;
     }
     
     // recover the signer of a signed message (internal pure)
-    function recoverSigner(address from, address to, uint256 value, bytes memory data, uint256 nonce, bytes memory signature) internal pure returns (address) {
-        bytes32 hash = keccak256(abi.encodePacked(from, to, value, data, nonce));
+    function recoverSigner(address from, address to, uint value, bytes memory data, uint256 nonce, uint gasPrice, uint gasLimit, bytes memory signature) internal pure returns (address) {
+        bytes32 hash = keccak256(abi.encodePacked(from, to, value, data, nonce, gasPrice, gasLimit));
         return hash.toEthSignedMessageHash().recover(signature);
     }
     
