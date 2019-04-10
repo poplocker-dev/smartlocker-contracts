@@ -71,10 +71,10 @@ contract SmartLocker {
     event KeyRemoved(address key);
     event SignedExecuted(address from, address to, uint value, bytes data, uint256 nonce, uint gasPrice, uint gasLimit, bytes result);
 
-    // only authorised keys modifier
-    modifier onlyAuthorisedKeys(address sender)
+    // only authorised keys or self modifier
+    modifier onlyAuthorisedKeysOrSelf(address sender)
     {
-        require(keys[sender]);
+        require(keys[sender] || sender == address(this));
         _;
     }
 
@@ -93,7 +93,7 @@ contract SmartLocker {
     }
 
     // add authorisation for given key (external)
-    function addKey(address key) external onlyAuthorisedKeys(msg.sender) {
+    function addKey(address key) external onlyAuthorisedKeysOrSelf(msg.sender) {
 
         // require key not null
         require(key != address(0));
@@ -110,7 +110,7 @@ contract SmartLocker {
     }
 
     // remove authorisation for given key (external)
-    function removeKey(address key) external onlyAuthorisedKeys(msg.sender) {
+    function removeKey(address key) external onlyAuthorisedKeysOrSelf(msg.sender) {
 
         // require key already authorised
         require(keys[key]);
@@ -126,9 +126,9 @@ contract SmartLocker {
         emit KeyRemoved(key);
     }
 
-    // execute transactions if signed by authorised keys (external)
+    // execute transaction if signed by authorised key (external)
     function executeSigned(address to, uint value, bytes calldata data, uint gasPrice, uint gasLimit, bytes calldata signature) external
-      onlyAuthorisedKeys(recoverSigner(address(this), to, value, data, nextNonce, gasPrice, gasLimit, signature))
+      onlyAuthorisedKeysOrSelf(recoverSigner(address(this), to, value, data, nextNonce, gasPrice, gasLimit, signature))
       returns (bytes memory) {
 
         // execute the transaction
