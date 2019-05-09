@@ -191,25 +191,23 @@ contract SmartLocker {
 
     // execute transactions if signed by authorised keys (external)
     function executeSigned(address to, uint value, bytes calldata data, uint gasPrice, uint gasLimit, bytes calldata signature) external
+        onlyAuthorisedKeysOrSelf(_recoverSigner(address(this), to, value, data, nextNonce, gasPrice, gasLimit, signature))
         returns (bytes memory) {
 
         // measure initial gas
-        uint256 initialGas = gasleft();
-
-        // require signer is an authorised key
-        require(keys[_recoverSigner(address(this), to, value, data, nextNonce, gasPrice, gasLimit, signature)].authorised);
-
-        // measure gas before transaction call
-        uint256 beforeCallGas = gasleft();
+        uint256 gasUsed = gasleft();
 
         // execute the transaction
         (bool success, bytes memory result) = to.call.value(value)(data);
 
-        // require gas used by transaction call not over gas limit
-        require((beforeCallGas - gasleft()) <= gasLimit);
+        // calculate gas used
+        gasUsed = gasUsed - gasleft();
 
         // require success
         require(success);
+
+        // require gas used not over gas limit
+        require(gasUsed <= gasLimit);
 
         // emit event
         emit SignedExecuted(address(this), to, value, data, nextNonce, gasPrice, gasLimit, result);
@@ -217,8 +215,8 @@ contract SmartLocker {
         // update the nonce
         nextNonce++;
 
-        // refund the gas used plus 21,000 for base cost and 64 for each input byte
-        msg.sender.transfer((initialGas - gasleft() + 21000 + (msg.data.length * 64)) * gasPrice);
+        // refund the gas used plus overhead of 40,000 and 68 for each input byte
+        msg.sender.transfer((gasUsed + 40000 + (msg.data.length * 68)) * gasPrice);
 
         // return the result
         return result;
