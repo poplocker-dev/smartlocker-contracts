@@ -5,33 +5,29 @@ import "./ECDSA.sol";
 contract SmartLockerRegistrar {
 
     // forward registrar
-    mapping(address=>string) registrar;
+    mapping(address=>bytes32) registrar;
 
     // reverse registrar
-    mapping(string=>address) reverseRegistrar;
+    mapping(bytes32=>address) reverseRegistrar;
 
     // fallback function (external non-payable)
     function() external {}
 
     // events
-    event SmartLockerCreated(string name, address smartLockerAddress);
-
-    // valid name length modifier
-    modifier validNameLength(string memory name) {
-
-        bytes memory nameBytes = bytes(name);
-        require(nameBytes.length > 0 && nameBytes.length <= 32);
-        _;
-    }
+    event SmartLockerCreated(bytes32 name, address smartLockerAddress);
 
     // create new smart locker with given name and keyname (external payable)
-    function createSmartLocker(string calldata name, string calldata keyname) external payable
-        validNameLength(name)
-        validNameLength(keyname)
+    function createSmartLocker(bytes32 name, bytes32 keyname) external payable
         returns (address) {
+
+        // require name not null
+        require(name != bytes32(0));
 
         // require name not already exist
         require(reverseRegistrar[name] == address(0));
+
+        // require keyname not null
+        require(keyname != bytes32(0));
 
         // deploy a new smart locker and send all value
         SmartLocker smartLocker = (new SmartLocker).value(msg.value)(msg.sender, keyname);
@@ -52,13 +48,13 @@ contract SmartLockerRegistrar {
 
     // get the name of the smart locker with given address (external view)
     function getName(address smartLockerAddress) external view
-        returns (string memory) {
+        returns (bytes32) {
 
         return registrar[smartLockerAddress];
     }
 
     // get the address of the smart locker with given name (external view)
-    function getAddress(string calldata name) external view
+    function getAddress(bytes32 name) external view
         returns (address) {
 
         return reverseRegistrar[name];
@@ -74,7 +70,7 @@ contract SmartLocker {
     struct Key {
         uint256 index;
         bool authorised;
-        string keyname;
+        bytes32 keyname;
         // TODO: other attributes here, e.g. management flag, threshold
     }
 
@@ -91,18 +87,10 @@ contract SmartLocker {
     uint256 nextNonce;
 
     // events
-    event KeyAdded(address key, string keyname);
+    event KeyAdded(address key, bytes32 keyname);
     event KeyRemoved(address key);
-    event KeyUpdated(address key, string keyname);
+    event KeyUpdated(address key, bytes32 keyname);
     event SignedExecuted(address from, address to, uint value, bytes data, uint256 nonce, uint gasPrice, uint gasLimit, bytes result);
-
-    // valid name length modifier
-    modifier validNameLength(string memory name) {
-
-        bytes memory nameBytes = bytes(name);
-        require(nameBytes.length > 0 && nameBytes.length <= 32);
-        _;
-    }
 
     // only authorised keys or self modifier
     modifier onlyAuthorisedKeysOrSelf(address sender) {
@@ -115,19 +103,20 @@ contract SmartLocker {
     function() external payable {}
 
     // constructor with given key and keyname (public payable)
-    constructor(address key, string memory keyname) public payable
-        validNameLength(keyname) {
+    constructor(address key, bytes32 keyname) public payable {
 
         // require key not null
         require(key != address(0));
+
+        // require keyname not null
+        require(keyname != bytes32(0));
 
         // add the key
         _addKey(key, keyname);
     }
 
     // add authorisation for given key and keyname (external)
-    function addKey(address key, string calldata keyname) external
-        validNameLength(keyname)
+    function addKey(address key, bytes32 keyname) external
         onlyAuthorisedKeysOrSelf(msg.sender) {
 
         // require key not null
@@ -136,12 +125,15 @@ contract SmartLocker {
         // require key not already authorised
         require(!keys[key].authorised);
 
+        // require keyname not null
+        require(keyname != bytes32(0));
+
         // add the key
         _addKey(key, keyname);
     }
 
     // add authorisation for given key and keyname (internal)
-    function _addKey(address key, string memory keyname) internal {
+    function _addKey(address key, bytes32 keyname) internal {
 
         // add the key as an authorised key
         keys[key].index = keyList.length;
@@ -177,9 +169,12 @@ contract SmartLocker {
         emit KeyRemoved(key);
     }
 
-    function updateKey(address key, string calldata keyname) external
-        validNameLength(keyname)
+    // update the given key (external)
+    function updateKey(address key, bytes32 keyname) external
         onlyAuthorisedKeysOrSelf(msg.sender) {
+
+        // require keyname not null
+        require(keyname != bytes32(0));
 
         // update the key
         keys[key].keyname = keyname;
@@ -239,7 +234,7 @@ contract SmartLocker {
 
     // get the given key (external view)
     function getKey(address key) external view
-        returns (string memory) {
+        returns (bytes32) {
 
         return keys[key].keyname;
         // TODO: other attributes here, e.g. management flag, threshold
